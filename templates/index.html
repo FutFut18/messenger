@@ -26,5 +26,21 @@
     {% if message %}
         <p>{{ message }}</p>
     {% endif %}
+    <div class="key-container">
+        {% if key1 %}
+            <div class="key-block">
+                <p class="key-text">Общий ключ: {{ key1 }}</p>
+                <button class="copy-btn" onclick="copyText('{{ key1 }}')">Копировать</button>
+            </div>
+        {% endif %}
+        {% if key2 %}
+            <div class="key-block">
+                <p class="key-text">Ключ входа: {{ key2 }}</p>
+                <button class="copy-btn" onclick="copyText('{{ key2 }}')">Копировать</button>
+            </div>
+        {% endif %}
+    </div>
+    <script src="/static/scripts/copyText.js"></script>
+
 </body>
 </html>

@@ -50,8 +50,8 @@ def index():
             hashed_key = hash_key(entry_key)
             with open(directory_path + "/hash.userdata", "w") as f:
                 f.write(hashed_key)
-            message = f"Сгенерирован ключ входа: {entry_key}, общий ключ: {public_key}"
-        return render_template('index.html', message=message)
+            #message = f"Сгенерирован ключ входа: {entry_key}, общий ключ: {public_key}"
+        return render_template('index.html', key1 = public_key, key2 = entry_key)
     return render_template('index.html')
 
 @app.route('/chats', methods=["GET", "POST"])
@@ -86,6 +86,39 @@ def chats():
             else:
                 message = "Введен неверный публичный ключ."
     return render_template('chats.html', message=message)
+
+@app.route('/nickname', methods=["GET", "POST"])
+def nickname():
+    if 'user_authenticated' not in session or not session['user_authenticated']:
+        return redirect(url_for('index'))
+    message = ""
+    if request.method == "POST":
+        action = request.form['action']
+        if action == 'logout':
+            return redirect(url_for('logout'))
+        if action == 'change':
+            nick = request.form.get('nick')
+            if nick == session['public_key']:
+                message = "Это ваш публичный ключ!"
+            else:
+                directory = f"data/users/{session['public_key']}"
+                if not os.path.isdir(directory):
+                    return redirect(url_for('index'))
+                else:
+                    file = f"{directory}/nick.userdata"
+                    if not os.path.isfile(file):
+                        with open(file, "w") as userdata:
+                            userdata.write("")
+                    filenns = "data/nns.serverdata"
+                    if not os.path.isfile(filenns):
+                        with open(filenns, "w") as nns:
+                            nns.write("")
+                    with open(file, "w") as userdata:
+                        userdata.write(nick)
+                    with open(filenns, "a") as nns:
+                        nns.write(f"{session['public_key']} ||| {nick}\n")
+
+    return render_template('nickname.html', message=message)
 
 @app.route('/messages', methods=["GET", "POST"])
 def messages():
