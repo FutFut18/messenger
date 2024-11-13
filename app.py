@@ -4,6 +4,7 @@ import string
 import os
 import bcrypt
 from datetime import datetime
+import shutil
 
 app = Flask(__name__)
 app.secret_key = os.urandom(84)
@@ -22,12 +23,17 @@ def generate_key(length):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    message = ""
     if request.method == 'POST':
         action = request.form['action']
         if action == 'login':
             public_key = request.form.get("public_key")
             user_key = request.form.get('user_key')
             if user_key and public_key:
+                if not os.path.isdir(f"data/users/{public_key}"):
+                    if os.path.isdir(f"data/nicknames/{public_key}"):
+                        with open(f"data/nicknames/{public_key}/key.userdata") as key:
+                            public_key = key.read()
                 try:
                     with open("data/users/" + public_key + "/hash.userdata") as f:
                         hash = f.read()
@@ -51,8 +57,8 @@ def index():
             with open(directory_path + "/hash.userdata", "w") as f:
                 f.write(hashed_key)
             #message = f"Сгенерирован ключ входа: {entry_key}, общий ключ: {public_key}"
-        return render_template('index.html', key1 = public_key, key2 = entry_key)
-    return render_template('index.html')
+            return render_template('index.html', key1 = public_key, key2 = entry_key)
+    return render_template('index.html', message = message)
 
 @app.route('/chats', methods=["GET", "POST"])
 def chats():
@@ -61,10 +67,16 @@ def chats():
     message = ""
     if request.method == "POST":
         action = request.form['action']
+        if action == 'nickchange':
+            return  redirect(url_for('nickname'))
         if action == 'logout':
             return redirect(url_for('logout'))
         if action == 'message':
             username = request.form.get('public_key')
+            if not os.path.isdir(f"data/users/{username}"):
+                if os.path.isdir(f"data/nicknames/{username}"):
+                    with open(f"data/nicknames/{username}/key.userdata") as key:
+                        username = key.read()
             if username == session['public_key']:
                 message = "Это ваш публичный ключ!"
             elif os.path.isdir(f"data/users/{username}"):
@@ -101,27 +113,39 @@ def nickname():
             if nick == session['public_key']:
                 message = "Это ваш публичный ключ!"
             else:
-                directory = f"data/users/{session['public_key']}"
-                if not os.path.isdir(directory):
-                    return redirect(url_for('index'))
+                if os.path.isdir(f"data/users/{nick}"):
+                    message = "Введенный никнейм является открытым ключом другого пользователя!"
                 else:
-                    file = f"{directory}/nick.userdata"
-                    if not os.path.isfile(file):
-                        with open(file, "w") as userdata:
-                            userdata.write("")
-                    filenns = "data/nns.serverdata"
-                    if not os.path.isfile(filenns):
-                        with open(filenns, "w") as nns:
-                            nns.write("")
-                    with open(file, "w") as userdata:
-                        userdata.write(nick)
-                    with open(filenns, "a") as nns:
-                        nns.write(f"{session['public_key']} ||| {nick}\n")
-
+                    directory = f"data/users/{session['public_key']}"
+                    if not os.path.isdir(directory):
+                        return redirect(url_for('index'))
+                    else:
+                        if os.path.isdir(f"data/nicknames/{nick}"):
+                            message = "Введённый никнейм уже занят!"
+                        else:
+                            if os.path.isfile(f"data/users/{session['public_key']}/nickname.userdata"):
+                                with open(f"data/users/{session['public_key']}/nickname.userdata", "r") as old_nick:
+                                    oldnick = old_nick.read()
+                                try:
+                                    shutil.rmtree(f"data/nicknames/{oldnick}")
+                                except:
+                                    1
+                            directorynick = f"data/nicknames/{nick}"
+                            os.mkdir(directorynick)
+                            with open (f"{directorynick}/key.userdata", "w") as keyuserdata:
+                                keyuserdata.write(session['public_key'])
+                            file = f"{directory}/nickname.userdata"
+                            with open(file, "w") as userdata:
+                                userdata.write(nick)
+                            message = f'Никнейм "{nick}" установлен успешно!'
     return render_template('nickname.html', message=message)
 
 @app.route('/messages', methods=["GET", "POST"])
 def messages():
+    nick1 = session['open_chat']
+    if os.path.isfile(f"data/users/{session['open_chat']}/nickname.userdata"):
+        with open(f"data/users/{session['open_chat']}/nickname.userdata") as file:
+            nick1 = file.read()
     if 'user_authenticated' not in session or not session['user_authenticated']:
         return redirect(url_for('index'))
 
@@ -144,14 +168,17 @@ def messages():
             message_text = request.form.get('message_text')
             if message_text:
                 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                new_message = f"{session['public_key']} ({timestamp}): {message_text}\n"
+                nick = session['public_key']
+                if os.path.isfile(f"data/users/{session['public_key']}/nickname.userdata"):
+                    with open(f"data/users/{session['public_key']}/nickname.userdata") as file:
+                        nick = file.read()
+                new_message = f"{nick} ({timestamp}): {message_text}\n"
                 with open(chat_file_path, 'a', encoding='utf-8') as file:
                     file.write(new_message)
                 with open(chat_file_path1, 'a', encoding='utf-8') as file:
                     file.write(new_message)
                 messages_history.append(new_message)
-
-    return render_template('messages.html', messages=messages_history)
+    return render_template('messages.html', messages=messages_history, nick = nick1)
 
 
 @app.route('/poll_messages')

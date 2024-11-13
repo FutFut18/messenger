@@ -11,7 +11,7 @@
 
     <form method="POST">
         <input type="hidden" name="action" value="message">
-        <label for="public_key">Введите общий ключ пользователя:</label>
+        <label for="public_key">Введите общий ключ или никнейм пользователя:</label>
         <input type="text" id="public_key" name="public_key" required>
         <button type="submit">Начать чат</button>
     </form>
@@ -19,6 +19,11 @@
     <form method="POST">
         <input type="hidden" name="action" value="logout">
         <button type="submit">Выход</button>
+    </form>
+
+    <form method="POST">
+        <input type="hidden" name="action" value="nickchange">
+        <button type="submit">Изменить или установить ник</button>
     </form>
 
     {% if message %}
