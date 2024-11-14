@@ -40,6 +40,13 @@ def index():
                     valid = check_key(user_key, hash)
                 except:
                     valid = False
+                if valid == False:
+                    try:
+                        with open(f"data/users/{public_key}/passwordhash.userdata") as file:
+                            hash1 = file.read()
+                        valid = check_key(user_key, hash1)
+                    except:
+                        valid = False
                 if valid:
                     session['user_authenticated'] = True
                     session['public_key'] = public_key
@@ -56,7 +63,6 @@ def index():
             hashed_key = hash_key(entry_key)
             with open(directory_path + "/hash.userdata", "w") as f:
                 f.write(hashed_key)
-            #message = f"Сгенерирован ключ входа: {entry_key}, общий ключ: {public_key}"
             return render_template('index.html', key1 = public_key, key2 = entry_key)
     return render_template('index.html', message = message)
 
@@ -65,10 +71,49 @@ def chats():
     if 'user_authenticated' not in session or not session['user_authenticated']:
         return redirect(url_for('index'))
     message = ""
+    directory = f"data/users/{session['public_key']}/chats"
+    chat_list = ['Null']
+    try:
+        for chat in os.listdir(directory):
+            if os.path.isdir(os.path.join(directory, chat)):
+                tempkey = chat
+                if os.path.isfile(f"data/users/{tempkey}/nickname.userdata"):
+                    with open(f"data/users/{tempkey}/nickname.userdata", "r") as nick:
+                        tempkey = nick.read()
+                chat_list.append(tempkey)
+    except:
+        1
     if request.method == "POST":
         action = request.form['action']
+        if action == 'passwordchange':
+            return  redirect(url_for('password'))
         if action == 'nickchange':
             return  redirect(url_for('nickname'))
+        if action == 'join_chat':
+            chat_name = request.form.get('chat_name')
+            print(chat_name)
+
+            if chat_name:
+                session['open_chat'] = chat_name
+                if not os.path.isdir(f"data/users/{chat_name}"):
+                    if os.path.isdir(f"data/nicknames/{chat_name}"):
+                        with open(f"data/nicknames/{chat_name}/key.userdata", "r") as file:
+                            chat_name = file.read().strip()
+
+                if os.path.isdir(f"data/users/{chat_name}"):
+                    chatdir = f"data/users/{session['public_key']}/chats"
+                    if not os.path.isdir(chatdir):
+                        os.mkdir(chatdir)
+                    user_chat_dir = f"data/users/{session['public_key']}/chats/{chat_name}"
+                    if not os.path.isdir(user_chat_dir):
+                        os.mkdir(user_chat_dir)
+                    other_user_chat_dir = f"data/users/{chat_name}/chats/{session['public_key']}"
+                    if not os.path.isdir(other_user_chat_dir):
+                        os.mkdir(other_user_chat_dir)
+                    session['open_chat'] = chat_name
+                    return redirect(url_for('messages'))
+                else:
+                    message = "Чат с таким публичным ключом или никнеймом не существует."
         if action == 'logout':
             return redirect(url_for('logout'))
         if action == 'message':
@@ -97,7 +142,7 @@ def chats():
                 return redirect(url_for('messages'))
             else:
                 message = "Введен неверный публичный ключ."
-    return render_template('chats.html', message=message)
+    return render_template('chats.html', message=message, chat_list = chat_list)
 
 @app.route('/nickname', methods=["GET", "POST"])
 def nickname():
@@ -106,10 +151,15 @@ def nickname():
     message = ""
     if request.method == "POST":
         action = request.form['action']
+        if action == 'back':
+            return redirect(url_for('chats'))
         if action == 'logout':
             return redirect(url_for('logout'))
         if action == 'change':
             nick = request.form.get('nick')
+            if len(nick) > 30:
+                message = ("Никнейм не может быть длиннее 30 символов")
+                return render_template('nickname.html', message=message)
             if nick == session['public_key']:
                 message = "Это ваш публичный ключ!"
             else:
@@ -140,14 +190,39 @@ def nickname():
                             message = f'Никнейм "{nick}" установлен успешно!'
     return render_template('nickname.html', message=message)
 
+@app.route('/password', methods=["GET", "POST"])
+def password():
+    if 'user_authenticated' not in session or not session['user_authenticated']:
+        return redirect(url_for('index'))
+    message = ""
+    if request.method == "POST":
+        action = request.form['action']
+        if action == 'back':
+            return redirect(url_for('chats'))
+        if action == 'logout':
+            return redirect(url_for('logout'))
+        if action == 'change':
+            password = request.form.get('password')
+            if len(password) > 480:
+                message = "Пароль не может иметь длину больше 480 символов"
+                return render_template('password.html', message=message)
+            if password == session['public_key']:
+                message = "Пароль не может совпадать с вашим открытым ключом!"
+            else:
+                hashed = hash_key(password)
+                with open(f"data/users/{session['public_key']}/passwordhash.userdata", "w") as file:
+                    file.write(hashed)
+                message = "Успешно установлен новый пароль"
+    return render_template('password.html', message=message)
+
 @app.route('/messages', methods=["GET", "POST"])
 def messages():
+    if 'user_authenticated' not in session or not session['user_authenticated']:
+        return redirect(url_for('index'))
     nick1 = session['open_chat']
     if os.path.isfile(f"data/users/{session['open_chat']}/nickname.userdata"):
         with open(f"data/users/{session['open_chat']}/nickname.userdata") as file:
             nick1 = file.read()
-    if 'user_authenticated' not in session or not session['user_authenticated']:
-        return redirect(url_for('index'))
 
     open_chat = session.get('open_chat', None)
     if not open_chat:
@@ -164,6 +239,8 @@ def messages():
 
     if request.method == "POST":
         action = request.form['action']
+        if action == 'back':
+            return redirect(url_for('chats'))
         if action == 'send_message':
             message_text = request.form.get('message_text')
             if message_text:

@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="static/chats/style.css">
 </head>
 <body>
-    <h1>Система чатов</h1>
+    <h1>Главная страница</h1>
 
     <form method="POST">
         <input type="hidden" name="action" value="message">
@@ -16,15 +16,44 @@
         <button type="submit">Начать чат</button>
     </form>
 
-    <form method="POST">
-        <input type="hidden" name="action" value="logout">
-        <button type="submit">Выход</button>
+    <form>
+        <label for="public_key">Список чатов:</label>
+            <div class="chat-list">
+                {% for chat in chat_list %}
+                <div class="chat-item">
+                    <form action="/chats" method="POST" class="chat-form">
+                        <input type="hidden" name="chat_name" value="{{ chat }}">
+                        <input type="hidden" name="action" value="join_chat">
+                        <button type="submit" class="chat-button">Войти в чат с {{ chat }}</button>
+                        <script>
+                            document.querySelectorAll('.chat-button').forEach(function(button) {
+                                if (button.textContent.trim() === "Войти в чат с Null") {
+                                    button.style.display = 'none';
+                                }
+                            });
+                        </script>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
     </form>
 
-    <form method="POST">
-        <input type="hidden" name="action" value="nickchange">
-        <button type="submit">Изменить или установить ник</button>
-    </form>
+
+
+<form method="POST" id="mainForm">
+    <input type="hidden" name="action" id="actionField" value="">
+
+    <button type="button" onclick="submitForm('nickchange')">Изменить или установить ник</button>
+    <button type="button" onclick="submitForm('passwordchange')">Изменить или установить пароль</button>
+    <button type="button" onclick="submitForm('logout')">Выход</button>
+</form>
+
+<script>
+    function submitForm(action) {
+        document.getElementById('actionField').value = action;
+        document.getElementById('mainForm').submit();
+    }
+</script>
 
     {% if message %}
         <p>{{ message }}</p>
